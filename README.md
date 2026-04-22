@@ -4,10 +4,9 @@ Python DRR renderer using a Siddon/Jacobs-style projector.
 
 <p align="center">
   <img src="assets/drr_orbit_00.png" width="18%" />
-  <img src="assets/drr_orbit_02.png" width="18%" />
-  <img src="assets/drr_orbit_04.png" width="18%" />
   <img src="assets/drr_orbit_06.png" width="18%" />
   <img src="assets/drr_single.png" width="18%" />
+  <img src="assets/orbit_z_rotation.gif" width="18%" />
 </p>
 
 ## Basic Usage
@@ -50,6 +49,18 @@ optional arguments:
                         Row chunksize for multiprocessing work scheduling in drr.renderer. (default: 1)
 ```
 
+## Requirements
+
+Python packages:
+
+```text
+- numpy
+- SimpleITK
+- tqdm
+- scipy
+- imageio
+```
+
 ## Notes
 
 - assumes the volume is axis-aligned
@@ -60,3 +71,7 @@ optional arguments:
 - `--invert` only changes saved display appearance for formats like PNG
 - rendering cost scales with detector size (`-size`) and smaller spacing (`-res`)
 - `-threshold` and negative clamping affect background / air contribution
+
+## Acknowledgement
+
+ChatGPT (GPT-5.4 Thinking, web interface) and Codex were used to assist with coding, debugging, and documentation for this project.

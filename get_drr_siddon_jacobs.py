@@ -32,12 +32,6 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-# Allow importing from the refactored package if the script is copied elsewhere.
-THIS_DIR = Path(__file__).resolve().parent
-PKG_ROOT = THIS_DIR / "drr_refactor"
-if PKG_ROOT.exists():
-    sys.path.insert(0, str(PKG_ROOT))
-
 from drr.volume import (
     load_volume_sitk,
     volume_center_world_xyz,
