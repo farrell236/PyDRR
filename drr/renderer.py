@@ -10,7 +10,6 @@ from .geometry import DRRGeometry, detector_pixel_centers_world, make_circular_o
 from .projector import ray_integral_siddon_jacobs
 from .volume import Volume, volume_center_world_xyz
 
-
 ProjectorFn = Callable[..., float]
 
 # Globals used by multiprocessing workers.
@@ -21,20 +20,13 @@ _MP_PROJECTOR_FN: Optional[ProjectorFn] = None
 _MP_PROJECTOR_KWARGS: Optional[Dict] = None
 
 
-def _init_row_worker(
-    vol: Volume,
-    source_mm: np.ndarray,
-    det_pts: np.ndarray,
-    projector_fn: ProjectorFn,
-    projector_kwargs: Dict,
-) -> None:
+def _init_row_worker(vol: Volume, source_mm: np.ndarray, det_pts: np.ndarray, projector_fn: ProjectorFn, projector_kwargs: Dict) -> None:
     global _MP_VOL, _MP_SOURCE_MM, _MP_DET_PTS, _MP_PROJECTOR_FN, _MP_PROJECTOR_KWARGS
     _MP_VOL = vol
     _MP_SOURCE_MM = source_mm
     _MP_DET_PTS = det_pts
     _MP_PROJECTOR_FN = projector_fn
     _MP_PROJECTOR_KWARGS = projector_kwargs
-
 
 
 def _render_row(row_idx: int) -> Tuple[int, np.ndarray]:
@@ -53,7 +45,6 @@ def _render_row(row_idx: int) -> Tuple[int, np.ndarray]:
     return row_idx, row
 
 
-
 def generate_drr(
     vol: Volume,
     geom: DRRGeometry,
@@ -62,21 +53,28 @@ def generate_drr(
     show_progress: bool = True,
     n_cores: Optional[int] = None,
     mp_chunksize: int = 1,
+    backend: str = "cpu",
 ) -> np.ndarray:
-    """Render one DRR image for a given projection geometry.
-
-    Args:
-        vol: Input volume.
-        geom: Source/detector geometry for one projection.
-        projector_fn: Per-ray projector. Must be picklable for multiprocessing.
-        projector_kwargs: Keyword arguments forwarded to ``projector_fn``.
-        show_progress: Show tqdm progress bars.
-        n_cores: If None or <= 1, render serially. If > 1, render detector rows
-            in parallel using ``multiprocessing.Pool``.
-        mp_chunksize: Row scheduling chunk size for multiprocessing.
-    """
     if projector_kwargs is None:
         projector_kwargs = {}
+
+    backend = str(backend).lower()
+    if backend not in {"cpu", "cuda"}:
+        raise ValueError("backend must be 'cpu' or 'cuda'")
+
+    if backend == "cuda":
+        if n_cores not in (None, 1):
+            raise ValueError("n_cores is not used when backend='cuda'")
+        if mp_chunksize != 1:
+            raise ValueError("mp_chunksize is not used when backend='cuda'")
+
+        from .projector_cuda import render_drr_cuda
+        return render_drr_cuda(
+            vol=vol,
+            geom=geom,
+            hu_air_threshold=projector_kwargs.get("hu_air_threshold", -900.0),
+            clamp_negative_to_zero=projector_kwargs.get("clamp_negative_to_zero", True),
+        )
 
     if mp_chunksize < 1:
         raise ValueError("mp_chunksize must be >= 1")
@@ -103,21 +101,17 @@ def generate_drr(
         return drr
 
     n_cores = int(n_cores)
-    row_iter_mp = range(H)
     with mp.Pool(
         processes=n_cores,
         initializer=_init_row_worker,
         initargs=(vol, geom.source_mm, det_pts, projector_fn, projector_kwargs),
     ) as pool:
-        results_iter = pool.imap(_render_row, row_iter_mp, chunksize=mp_chunksize)
+        results_iter = pool.imap(_render_row, range(H), chunksize=mp_chunksize)
         if show_progress:
             results_iter = tqdm(results_iter, total=H, desc=f"Rendering DRR ({n_cores} cores)", leave=False)
-
         for r, row in results_iter:
             drr[r] = row
-
     return drr
-
 
 
 def generate_orbit_drrs(
@@ -132,20 +126,14 @@ def generate_orbit_drrs(
     n_cores: Optional[int] = None,
     mp_chunksize: int = 1,
     show_progress: bool = True,
+    backend: str = "cpu",
 ) -> List[np.ndarray]:
-    """Render DRRs for a sequence of circular-orbit angles.
-
-    Multiprocessing is applied within each DRR render across detector rows.
-    """
     if projector_kwargs is None:
         projector_kwargs = {}
 
     iso_center = volume_center_world_xyz(vol)
     drrs = []
-
-    angle_iter = angles_deg
-    if show_progress:
-        angle_iter = tqdm(angles_deg, desc="Orbit DRRs")
+    angle_iter = tqdm(angles_deg, desc="Orbit DRRs") if show_progress else angles_deg
 
     for ang in angle_iter:
         geom = make_circular_orbit_pose(
@@ -164,6 +152,7 @@ def generate_orbit_drrs(
             show_progress=False,
             n_cores=n_cores,
             mp_chunksize=mp_chunksize,
+            backend=backend,
         )
         drrs.append(drr)
 

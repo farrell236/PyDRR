@@ -40,11 +40,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--invert", action="store_true", help="Save with X-ray-like black anatomy on white background")
     parser.add_argument("--n-cores", type=int, default=None, help="Number of CPU worker processes for row-parallel rendering")
     parser.add_argument("--mp-chunksize", type=int, default=1, help="Multiprocessing chunksize for row scheduling")
+    parser.add_argument("--backend", choices=["cpu", "cuda"], default="cpu", help="Rendering backend")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.backend == "cuda" and args.n_cores not in (None, 1):
+        raise ValueError("--n-cores is only for CPU backend")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,6 +82,7 @@ def main() -> None:
         show_progress=True,
         n_cores=args.n_cores,
         mp_chunksize=args.mp_chunksize,
+        backend=args.backend,
     )
     print_projection_stats(drr, "Single DRR")
 
@@ -98,6 +102,7 @@ def main() -> None:
         projector_kwargs=projector_kwargs,
         n_cores=args.n_cores,
         mp_chunksize=args.mp_chunksize,
+        backend=args.backend,
     )
 
     for i, img in enumerate(drrs):

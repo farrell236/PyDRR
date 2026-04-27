@@ -9,14 +9,45 @@ Python DRR renderer using a Siddon/Jacobs-style projector.
   <img src="assets/orbit_z_rotation.gif" width="18%" />
 </p>
 
+## Requirements
+
+Python packages:
+
+```text
+numpy
+SimpleITK
+tqdm
+scipy
+imageio
+````
+
+Optional for CUDA backend:
+
+```text
+cupy-cuda12x
+```
+
+Example install:
+
+```bash
+pip install numpy SimpleITK tqdm scipy imageio
+pip install cupy-cuda12x
+```
+
+CUDA backend requires:
+
+* NVIDIA GPU
+* CUDA 12-compatible driver/runtime
+* NVRTC (`libnvrtc.so.12`) available on the system
+
 ## Basic Usage
 
 Single lateral-like DRR:
 
 ```bash
-(python39) [user@machine python-drr]$ python get_drr_siddon_jacobs.py --help
+(user@machine python-drr)$ python get_drr_siddon_jacobs.py --help
 usage: get_drr_siddon_jacobs.py [-h] [-v] [-res ROW_MM COL_MM] [-size H W] [-scd SCD] [-t TX TY TZ] [-rx RX] [-ry RY] [-rz RZ] [-2dcx COL ROW] [-iso IX IY IZ] [-rp RP] [-threshold THRESHOLD] -o OUTPUT [--invert] [--no-clamp-negative]
-                                [--p-lo P_LO] [--p-hi P_HI] [--n-cores N_CORES] [--mp-chunksize MP_CHUNKSIZE]
+                                [--p-lo P_LO] [--p-hi P_HI] [--n-cores N_CORES] [--mp-chunksize MP_CHUNKSIZE] [--backend {cpu,cuda}]
                                 input
 
 Calculate a Digitally Reconstructed Radiograph from a CT/CBCT image using a Siddon/Jacobs-style ray-tracing projector.
@@ -47,30 +78,33 @@ optional arguments:
   --n-cores N_CORES     Number of CPU cores/processes for parallel rendering. Omit for serial rendering. (default: None)
   --mp-chunksize MP_CHUNKSIZE
                         Row chunksize for multiprocessing work scheduling in drr.renderer. (default: 1)
+  --backend {cpu,cuda}  Rendering backend. 'cpu' uses the Python projector, 'cuda' uses CuPy RawKernel. (default: cpu)
 ```
 
-## Requirements
+Example CPU render:
 
-Python packages:
+```bash
+python get_drr_siddon_jacobs.py input.nii.gz -rz 30 --invert --n-cores 8 -o drr_cpu.png --backend cpu
+```
 
-```text
-- numpy
-- SimpleITK
-- tqdm
-- scipy
-- imageio
+Example CUDA render:
+
+```bash
+python get_drr_siddon_jacobs.py input.nii.gz -rz 30 --invert -o drr_cuda.png --backend cuda
 ```
 
 ## Notes
 
-- assumes the volume is axis-aligned
-- SimpleITK direction matrix is currently ignored
-- `-res` is interpreted as spacing at the **isocenter plane**
-- supports multiprocessing with `--n-cores`
-- rotations/translations are applied to the **volume**
-- `--invert` only changes saved display appearance for formats like PNG
-- rendering cost scales with detector size (`-size`) and smaller spacing (`-res`)
-- `-threshold` and negative clamping affect background / air contribution
+* assumes the volume is axis-aligned
+* SimpleITK direction matrix is currently ignored
+* `-res` is interpreted as spacing at the **isocenter plane**
+* supports multiprocessing with `--n-cores` for CPU backend
+* rotations/translations are applied to the **volume**
+* `--invert` only changes saved display appearance for formats like PNG
+* rendering cost scales with detector size (`-size`) and smaller spacing (`-res`)
+* `-threshold` and negative clamping affect background / air contribution
+* `--backend cuda` uses CuPy `RawKernel`
+* CPU multiprocessing is disabled if CUDA backend is used
 
 ## Acknowledgement
 
